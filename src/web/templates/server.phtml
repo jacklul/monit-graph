@@ -49,6 +49,8 @@ $body .= '<a href="' . $router->pathFor('root') . '">Back to dashboard</a>';
 $get_data_route = $router->pathFor('get_data', ['server_id' => $server_id]);
 foreach($files as $file) {
   $filename = basename($file);
+  if (substr($filename, -4) == '.xml')
+    $filename = substr($filename, 0, -4);
 
   /* The javascript has some logic to parse the JSON, and to keep overhead down */
   $header .= <<<EOF
@@ -67,16 +69,22 @@ foreach($files as $file) {
       async: true,
       cache: false,
     }).done(function(data){
+      var is_status_type = false;
+      var has_swap_data = false;
       data = JSON.stringify(data).replace(/('|\")%%/g, "").replace(/%%('|\")/g, "");
-      console.log(data);
       var evalledData = eval("(" + data + ")");
       if (typeof evalledData != "object") return;
-      if ('$chart_type'=='Gauge') evalledData.rows.splice(1,evalledData.rows.length);
+      if ('$chart_type'=='Gauge') evalledData.rows.splice(0, evalledData.rows.length - 1);
       if ("on" == "$dont_show_alerts") {
         for( i = 0; i < evalledData["cols"].length; i++ ) {
-          if ( evalledData["cols"][i]["label"] == "Alerts" ) {
+          if (!is_status_type && evalledData["cols"][i]["label"] == "Status") {
+            is_status_type = true;
+          } else if (!has_swap_data && evalledData["cols"][i]["label"] == "Swap") {
+            has_swap_data = true;
+          } else if ( evalledData["cols"][i]["label"] == "Alerts" ) {
+            evalledData["cols"].splice(i, 1);
             for( j = 0; j < evalledData.rows.length; j++ ) {
-              evalledData.rows[j].c[i].v = null;
+              evalledData.rows[j].c.splice(i, 1);
             }
           }
         }
@@ -91,14 +99,43 @@ foreach($files as $file) {
           data$i.addRow(evalledData.rows[i].c);
         }
       }
+      //console.log(evalledData);
       delete evalledData;
 
       if (chart$i == null) chart$i = new google.visualization.$chart_type(document.getElementById('chart_div$i'));
-      chart$i.draw(data$i, {
-        title : "$filename",
-        vAxis: {title: "Usage in %", minValue: 0},
-        hAxis: {title: "Time"}
-      });
+
+      var dateFormatter = new google.visualization.DateFormat({pattern: 'YYYY-MM-dd HH:mm'});
+      dateFormatter.format(data$i, 0);
+
+      if (!is_status_type) {
+        var percentageFormatter = new google.visualization.NumberFormat({suffix: '%', fractionDigits: 1});
+        percentageFormatter.format(data$i, 1);
+        percentageFormatter.format(data$i, 2);
+        if (('$chart_type'=='Gauge' && "on" != "$dont_show_alerts") || has_swap_data) percentageFormatter.format(data$i, 3);
+      }
+
+      var config = {
+        //title : '$filename',
+        vAxis: {title: 'Usage in %', minValue: 0, maxValue: 100, scaleType: 'log', format: "#'%"},
+        hAxis: {title: 'Time', format: 'HH:mm'},
+        chartArea: {left: 75, top: 25, right: 25, bottom: 100, width: '80%', height: '80%'},
+        padding: 0,
+        fontSize: 16,
+        legend: 'bottom',
+        is3D: true,
+        animation: {startup: true, duration: 250, easing: 'inAndOut'},
+        tooltip: {trigger: 'both', isHtml: true},
+        explorer: {
+            maxZoomOut: 1,
+            maxZoomIn: 10,
+            keepInBounds: true
+        },
+      };
+      if (is_status_type) {
+        config.vAxis = {title: 'Status', format: 0};
+      }
+
+      chart$i.draw(data$i, config);
       if ($refresh_seconds>0) {
         var timeout = setTimeout("drawVisualization$i()", $refresh_miliseconds);
       }
@@ -110,7 +147,7 @@ EOF;
   $output_body .= <<<EOF
 <div class="bordered_box">
   <h2><a href="#" onclick="javascript:$('#chart_div$i').toggle('fast');return false;">$filename</a></h2>
-  <div id="chart_div$i" style="width: 800px; height: 400px; margin:20px;">
+  <div id="chart_div$i" style="width: auto; height: 600px; margin: 10px;">
     Loading Chart...
   </div>
 </div>
@@ -128,20 +165,26 @@ $body .= '
     <select name="chart_type">
       <option value="LineChart"' . @$selected_chart_type['LineChart'] . '>Line Chart</option>
       <option value="AreaChart"' . @$selected_chart_type['AreaChart'] . '>Area Chart</option>
-      <option value="Gauge"' . @$selected_chart_type['Gauge'] . '>Gauge</option>
+      <option value="SteppedAreaChart"' . @$selected_chart_type['SteppedAreaChart'] . '>Stepped Area Chart</option>
       <option value="AnnotatedTimeLine"' . @$selected_chart_type['AnnotatedTimeLine'] . '>Annotated Time Line</option>
+      <option value="Gauge"' . @$selected_chart_type['Gauge'] . '>Gauge</option>
     </select>
   </label>
 </div>
-<div class="input_box"><label><strong>Update Frequency:</strong> <input type="text" name="refresh_seconds" value="' . $refresh_seconds . '" size="4" /></label> seconds (don\'t go lower than update cycle of the monit instance)</div>
-<div class="input_box"><label><strong>Specific Service:</strong> <input type="text" name="specific_services" value="' . $specific_services . '" size="10" /></label></div>
+<div class="input_box"><label><strong>Update frequency:</strong> <input type="text" name="refresh_seconds" value="' . $refresh_seconds . '" size="4" /></label> seconds</div>
+<div class="input_box"><label><strong>Specific service:</strong> <input type="text" name="specific_services" value="' . $specific_services . '" size="10" /></label></div>
 <div class="input_box">
-  <label><strong>Time Range:</strong>
+  <label><strong>Time range:</strong>
   <select name="time_range">
     <option value="300"' . @$selected_time_range[300] . '>Last 5 minutes</option>
+    <option value="600"' . @$selected_time_range[600] . '>Last 10 minutes</option>
+    <option value="900"' . @$selected_time_range[900] . '>Last 15 minutes</option>
     <option value="1200"' . @$selected_time_range[1200] . '>Last 20 minutes</option>
+    <option value="1800"' . @$selected_time_range[1800] . '>Last 30 minutes</option>
     <option value="3600"' . @$selected_time_range[3600] . '>Last 1 hour</option>
     <option value="7200"' . @$selected_time_range[7200] . '>Last 2 hours</option>
+    <option value="10800"' . @$selected_time_range[10800] . '>Last 3 hours</option>
+    <option value="21600"' . @$selected_time_range[21600] . '>Last 6 hours</option>
     <option value="43200"' . @$selected_time_range[43200] . '>Last 12 hours</option>
     <option value="86400"' . @$selected_time_range[86400] . '>Last 24 hours</option>
     <option value="172800"' . @$selected_time_range[172800] . '>Last 2 days</option>
@@ -155,7 +198,19 @@ $body .= '
   </label>
 </div>
 <div class="input_box">
-  <label><strong>Hide Alerts:</strong> <input type="checkbox" name="dont_show_alerts" value="on"' . @$selected_dont_show_alerts . '></label>
+  <label><strong>Hide alerts:</strong> <input type="checkbox" name="dont_show_alerts" value="on"' . @$selected_dont_show_alerts . '></label>
+<script>
+  document.getElementById("view_form").addEventListener("submit", function (e) {
+    const checkbox = document.querySelector("input[name=dont_show_alerts]");
+    if (!checkbox.checked) {
+      const hiddenInput = document.createElement("input");
+      hiddenInput.type = "hidden";
+      hiddenInput.name = "dont_show_alerts";
+      hiddenInput.value = "off";
+      this.appendChild(hiddenInput);
+    }
+  });
+</script>
 </div>
 <div class="submit_box">
   <input type="submit" class="submit" value="Update View">

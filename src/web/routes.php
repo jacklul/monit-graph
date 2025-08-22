@@ -18,22 +18,29 @@ $app->get('/server/{server_id}/data', function ($request, $response, $args) {
 
 $app->delete('/server/{server_id}', function ($request, $response, $args) {
     $config = $this->renderer->getAttribute('config');
-    foreach ($config['server_configs'] as $server_config) {
-        if ($server_config['server_id'] == $args['server_id']) {
-            $name = $server_config['name'];
-            break;
-        }
-    }
+    $allow_delete = isset($config['allow_delete']) && $config['allow_delete'] === true;
 
-    if ($args['delete_data']=="1") {
-        $filename = null;
+    if ($allow_delete) {
+        $name = 'unknown';
+        foreach ($config['server_configs'] as $server_config) {
+            if ($server_config['server_id'] == $args['server_id']) {
+                $name = $server_config['name'];
+                break;
+            }
+        }
+
+        if ($args['delete_data']=="1") {
+            $filename = null;
+        } else {
+            $filename = $args['delete_data'];
+        }
+        if (\MonitGraph\Base::deleteDataFiles($args['server_id'], $filename)) {
+            $yield = '<h1>All the files have been deleted successfully at ' . $name . '</h1>';
+        } else {
+            $yield = '<h1>Some errors happened in the deletion process</h1>';
+        }
     } else {
-        $filename = $args['delete_data'];
-    }
-    if (\MonitGraph\Base::deleteDataFiles($args['server_id'], $filename)) {
-        $yield = '<h1>All the files have been deleted successfully at ' . $name . '</h1>';
-    } else {
-        $yield = '<h1>Some errors happened in the deletion process';
+        $yield = '<h1>Service data deletion is disabled</h1>';
     }
 
     return $this->renderer->render($response, 'delete.phtml', ['yield' => $yield]);
@@ -41,7 +48,7 @@ $app->delete('/server/{server_id}', function ($request, $response, $args) {
 
 $app->get('/server/{server_id}/delete', function ($request, $response, $args) {
     $params = $request->getQueryParams();
-    return $this->renderer->render($response, '_confirm_delete.phtml', ['yield' => $yield, 'server_id' => $args['server_id'], 'delete_data' => $params['delete_data']]);
+    return $this->renderer->render($response, '_confirm_delete.phtml', ['server_id' => $args['server_id'], 'delete_data' => $params['delete_data']]);
 })->setName('delete_data');
 
 $app->get('/server/{server_id}', function ($request, $response, $args) {

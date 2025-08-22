@@ -1,4 +1,5 @@
 <?php
+
 if (!file_exists(__DIR__ . "/servers.ini")) {
     die("Please set config/servers.ini first");
 }
@@ -23,7 +24,14 @@ return [
       'addContentLengthHeader' => false, // Allow the web server to send the content-length header
   ],
 
+  /* Override data directory */
+  //'data_dir' => "/var/lib/monit-graph/",
+
   // Basic authentication can be enabled. By default, ADMIN_PASSWORD environment variables
   // is used. You can generate your own hashed password by running `htpasswd -nbBC 10 username password`
   // 'basic_auth_users' => ['admin' => getenv('ADMIN_PASSWORD')]
+
+  // Enable deletion of the data from the interface. Disabled by default.
+  //'allow_delete' => true,
+
 ];
