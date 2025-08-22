@@ -406,8 +406,8 @@ class Base
         if ($xml["type"]=="5") {
             $array["cols"]=[
                             ["label"=>"Time","type"=>"datetime"],
-                            ["label"=>"CPU Usage","type"=>"number"],
-                            ["label"=>"Memory Usage","type"=>"number"],
+                            ["label"=>"CPU","type"=>"number"],
+                            ["label"=>"Memory","type"=>"number"],
                             ["label"=>"Swap","type"=>"number"],
                             ["label"=>"Alerts","type"=>"number"]
                         ];
@@ -420,8 +420,8 @@ class Base
         } else {
             $array["cols"]=[
                             ["label"=>"Time","type"=>"datetime"],
-                            ["label"=>"CPU Usage","type"=>"number"],
-                            ["label"=>"Memory Usage","type"=>"number"],
+                            ["label"=>"CPU","type"=>"number"],
+                            ["label"=>"Memory","type"=>"number"],
                             ["label"=>"Alerts","type"=>"number"]
                         ];
         }
@@ -522,7 +522,7 @@ class Base
         $return_array = [];
         foreach ($files as $file) {
             if (!file_exists($file) or !$xml=simplexml_load_string(file_get_contents($file))) {
-                error_log("[".self::IDENTIFIER."] ".__FILE__." line ".__LINE__.": $filename could not be loaded!");
+                error_log("[".self::IDENTIFIER."] ".__FILE__." line ".__LINE__.": $file could not be loaded!");
                 return false;
             }
             $return_array[]=[
