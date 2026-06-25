@@ -1,4 +1,5 @@
 <?php
+
 require __DIR__ . '/../../vendor/autoload.php';
 
 /* This tool can reverse specified XML documents, if needed. */
@@ -52,14 +53,14 @@ foreach ($files as $file) {
                 $cpu = $dom->createElement("cpu", $record->cpu);
                 $new_service->appendChild($cpu);
 
-                $pid = $dom->createElement("pid", $record->pid);
-                $new_service->appendChild($pid);
+                //$pid = $dom->createElement("pid", $record->pid);
+                //$new_service->appendChild($pid);
 
-                $uptime = $dom->createElement("uptime", $record->uptime);
-                $new_service->appendChild($uptime);
+                //$uptime = $dom->createElement("uptime", $record->uptime);
+                //$new_service->appendChild($uptime);
 
-                $children = $dom->createElement("children", $record->children);
-                $new_service->appendChild($children);
+                //$children = $dom->createElement("children", $record->children);
+                //$new_service->appendChild($children);
             }
 
             $status = $dom->createElement("status", $record->status);

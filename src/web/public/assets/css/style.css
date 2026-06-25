@@ -77,7 +77,7 @@ a:hover {
 }
 .server_box .service_header div, .server_box .service_row div {
     float:left;
-    width:250px;
+    min-width:150px;
 }
 
 .server_box div strong {

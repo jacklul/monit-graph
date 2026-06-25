@@ -1,4 +1,5 @@
 <?php
+
 $body = "";
 $output_body = "";
 
@@ -69,19 +70,19 @@ foreach($files as $file) {
       async: true,
       cache: false,
     }).done(function(data){
-      var is_status_type = false;
-      var has_swap_data = false;
+      const numeric_types = ['Size', 'Status', 'Download', 'Upload'];
+      var is_percentage_type = true;
+
       data = JSON.stringify(data).replace(/('|\")%%/g, "").replace(/%%('|\")/g, "");
       var evalledData = eval("(" + data + ")");
       if (typeof evalledData != "object") return;
-      if ('$chart_type'=='Gauge') evalledData.rows.splice(0, evalledData.rows.length - 1);
-      if ("on" == "$dont_show_alerts") {
+
+      if ('$chart_type'=='Gauge') // remove all records except the last one
+        evalledData.rows.splice(0, evalledData.rows.length - 1);
+
+      if ("on" == "$dont_show_alerts") { // remove the Alert column and its data
         for( i = 0; i < evalledData["cols"].length; i++ ) {
-          if (!is_status_type && evalledData["cols"][i]["label"] == "Status") {
-            is_status_type = true;
-          } else if (!has_swap_data && evalledData["cols"][i]["label"] == "Swap") {
-            has_swap_data = true;
-          } else if ( evalledData["cols"][i]["label"] == "Alerts" ) {
+          if (evalledData["cols"][i]["label"] == "Alert" || evalledData["cols"][i]["label"] == "Alerts") {
             evalledData["cols"].splice(i, 1);
             for( j = 0; j < evalledData.rows.length; j++ ) {
               evalledData.rows[j].c.splice(i, 1);
@@ -89,6 +90,52 @@ foreach($files as $file) {
           }
         }
       }
+
+      // Loop through each column and process the data based on its label
+      for (let i = 0; i < evalledData.cols.length; i++) {
+        const label = evalledData.cols[i].label;
+
+        for (let j = 0; j < evalledData.rows.length; j++) {
+          const cell = evalledData.rows[j].c[i];
+
+          if (label === "Time") {
+            // Do nothing for Time column
+            continue;
+          } else if (label === "Alert" || label === "Alerts") {
+            cell.v = Number(cell.v) > 0 ? 1 : 0;
+            cell.f = cell.v ? "True" : "False";
+          } else if (numeric_types.includes(label)) {
+            is_percentage_type = false;
+            cell.v = Number(cell.v);
+            cell.f = null;
+          } else {
+            cell.v = Number(cell.v);
+            cell.f = cell.v + "%";
+          }
+        }
+      }
+
+      // If there is one hour difference between two points, insert extra records with zeroed values to make the chart more readable
+      for (let i = 1; i < evalledData.rows.length; i++) {
+        const prevTime = evalledData.rows[i - 1].c[0].v;
+        const currTime = evalledData.rows[i].c[0].v;
+
+        if (currTime - prevTime >= 3600000) { // 1 hour in ms
+          const numCols = evalledData.cols.length;
+
+          const row1 = { c: [{ v: new Date(prevTime.getTime() + 60000), f: null }] };
+          const row2 = { c: [{ v: new Date(currTime.getTime() - 60000), f: null }] };
+          for (let k = 1; k < numCols; k++) {
+            row1.c.push({ v: 0, f: null });
+            row2.c.push({ v: 0, f: null });
+          }
+
+          evalledData.rows.splice(i, 0, row1, row2);
+          i += 2; // skip newly inserted rows
+        }
+      }
+
+      //const data_cols = evalledData["cols"].length;
 
       if (data$i==null) {
         data$i = new google.visualization.DataTable(evalledData);
@@ -99,24 +146,31 @@ foreach($files as $file) {
           data$i.addRow(evalledData.rows[i].c);
         }
       }
+
       //console.log(evalledData);
       delete evalledData;
 
+      // create chart object if it doesn't exist yet
       if (chart$i == null) chart$i = new google.visualization.$chart_type(document.getElementById('chart_div$i'));
 
+      // Always format the first column (Time) as a date
       var dateFormatter = new google.visualization.DateFormat({pattern: 'YYYY-MM-dd HH:mm'});
       dateFormatter.format(data$i, 0);
 
-      if (!is_status_type) {
+      // Format remaining columns as percentages
+      /*if (is_percentage_type) { // old method, not used anymore
         var percentageFormatter = new google.visualization.NumberFormat({suffix: '%', fractionDigits: 1});
-        percentageFormatter.format(data$i, 1);
-        percentageFormatter.format(data$i, 2);
-        if (('$chart_type'=='Gauge' && "on" != "$dont_show_alerts") || has_swap_data) percentageFormatter.format(data$i, 3);
-      }
+
+        var data_cut = ("on" == "$dont_show_alerts") ? 2 : 1;
+
+        for (i = 0; i < data_cols - data_cut; i++) {
+          percentageFormatter.format(data$i, i);
+        }
+      }*/
 
       var config = {
         //title : '$filename',
-        vAxis: {title: 'Usage in %', minValue: 0, maxValue: 100, scaleType: 'log', format: "#'%"},
+        vAxis: {title: 'Value in %', minValue: 0, maxValue: 100, scaleType: 'log', format: "#'%'"}, // "#'%"
         hAxis: {title: 'Time', format: 'HH:mm'},
         chartArea: {left: 75, top: 25, right: 25, bottom: 100, width: '80%', height: '80%'},
         padding: 0,
@@ -126,16 +180,23 @@ foreach($files as $file) {
         animation: {startup: true, duration: 250, easing: 'inAndOut'},
         tooltip: {trigger: 'both', isHtml: true},
         explorer: {
-            maxZoomOut: 1,
-            maxZoomIn: 10,
+            maxZoomOut: 5,
+            maxZoomIn: 0.1,
             keepInBounds: true
         },
+        //curveType: 'function',
+        pointSize: 2,
+        pointShape: 'circle',
+        lineWidth: 2,
       };
-      if (is_status_type) {
-        config.vAxis = {title: 'Status', format: 0};
+
+      if (!is_percentage_type) {
+        config.vAxis = {title: 'Value', format: "#,##0"};
+        config.chartArea.left = 150;
       }
 
       chart$i.draw(data$i, config);
+
       if ($refresh_seconds>0) {
         var timeout = setTimeout("drawVisualization$i()", $refresh_miliseconds);
       }

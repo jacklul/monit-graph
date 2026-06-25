@@ -1,4 +1,5 @@
 <?php
+
 $config = \MonitGraph\Base::config();
 
 $default_config = [
@@ -15,4 +16,4 @@ $default_config = [
   ],
 ];
 
-return ['settings' => array_merge($default_config, $config['slimconfig'])];
+return ['settings' => array_merge_recursive($default_config, $config['slimconfig'])];

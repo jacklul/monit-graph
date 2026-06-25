@@ -1,4 +1,5 @@
 <?php
+
 // Routes
 $app->get('/server/{server_id}/data', function ($request, $response, $args) {
     $params = $request->getQueryParams();
@@ -57,12 +58,12 @@ $app->get('/server/{server_id}', function ($request, $response, $args) {
         $response,
         'server.phtml',
         [
-                                   'server_id' => $args['server_id'],
-                                   'chart_type' => @$params['chart_type'],
-                                   'time_range' => @$params['time_range'],
-                                   'refresh_seconds' => @$params['refresh_seconds'],
-                                   'specific_services' => @$params['specific_services'],
-                                   'dont_show_alerts' => @$params['dont_show_alerts']
+            'server_id' => $args['server_id'],
+            'chart_type' => @$params['chart_type'],
+            'time_range' => @$params['time_range'],
+            'refresh_seconds' => @$params['refresh_seconds'],
+            'specific_services' => @$params['specific_services'],
+            'dont_show_alerts' => @$params['dont_show_alerts']
         ]
     );
 })->setName('server');
